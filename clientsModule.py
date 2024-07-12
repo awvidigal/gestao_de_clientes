@@ -5,6 +5,23 @@ import pandas   as pd
 import datetime as dt
 
 dbName = 'agv.db'
+typeDict = {
+            'consumption':'consumo',
+            'peak-consumption':'consumo',
+            'off-peak-consumption':'consumo',
+            'demand':'demanda',
+            'peak-demand':'demanda',
+            'off-peak-demand':'demanda'
+        }
+
+hourDict = {
+            'consumption':'Nao se aplica',
+            'peak-consumption':'Ponta',
+            'off-peak-consumption':'Fora ponta',
+            'demand':'Nao se aplica',
+            'peak-demand':'Ponta',
+            'off-peak-demand':'Fora ponta'
+        }
 
 class client:
     '''
@@ -95,25 +112,6 @@ class client:
             :param year: A reference year. If None, then the method will consider the current year
             :return: int
         '''
-
-        typeDict = {
-            'consumption':'consumo',
-            'peak-consumption':'consumo',
-            'off-peakpconsumption':'consumo',
-            'demand':'demanda',
-            'peak-demand':'demanda',
-            'off-peak-demand':'demanda'
-        }
-
-        hourDict = {
-            'consumption':'Nao se aplica',
-            'peak-consumption':'Ponta',
-            'off-peakpconsumption':'Fora ponta',
-            'demand':'Nao se aplica',
-            'peak-demand':'Ponta',
-            'off-peak-demand':'Fora ponta'
-        }
-
         total = None
 
         if not year:
@@ -208,7 +206,7 @@ class uc:
         self.modality       = modality
         self.peakDemand     = peakDemand
         self.offPeakDemand  = offPeakDemand
-        self.Demand         = demand
+        self.demand         = demand
     
     '''
  ## ##   ### ##   ##  ###  ### ##             ## ##   #### ##    ##     ### ##   #### ##  
@@ -221,10 +219,54 @@ class uc:
     '''      
 
     def createUC(self) -> int:
-        pass
+        '''
+        This method create an UC in the database. It returns a RunTimeError if you try to create an existent UC, and returns 0 if everything runs ok
+        '''
+        ucValidation = self.readUC()
+
+        if not ucValidation:
+            date = dt.datetime.now()
+            
+            conn = sql.connect(dbName)
+            cursor = conn.cursor()
+
+            clientID = cursor.execute(
+                '''
+                SELECT id
+                FROM clientes
+                WHERE nome = ?
+                ''', (self.client,)
+            ).fetchone()
+            
+            cursor.execute(
+                '''
+                INSERT INTO ucs (numero, concessionaria, client_id, endereco, cep, subgrupo, modalidade, demanda, demanda_ponta, demanda_fora_ponta, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                ''', (self.number, self.utility, clientID, self.address, self.CEP, self.subgroup, self.modality, self.demand, self.peakDemand, self.offPeakDemand, date)
+            )
+            conn.commit()
+            conn.close()
+
+        else:
+            raise RuntimeError('Essa UC já está cadastrada')
+
+        return 0
     
-    def readUC(self) -> int:
-        pass
+    def readUC(self):
+        conn = sql.connect(dbName)
+        cursor = conn.cursor()
+
+        ucRegister = cursor.execute(
+            '''
+            SELECT *
+            FROM ucs
+            WHERE numero = ?
+            ''', (self.number,)
+        ).fetchone()
+
+        conn.close()
+
+        return ucRegister
 
     def updateUC(self) -> int:
         pass
@@ -243,6 +285,8 @@ class uc:
             5. peak-demand
             6. off-peak-demand
         '''
+
+
         pass
 
     def readValue(self, month, valueType) -> int:
