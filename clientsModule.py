@@ -23,6 +23,15 @@ hourDict = {
             'off-peak-demand':'Fora ponta'
         }
 
+valueTypesList = [
+    'consumption',
+    'peak-consumption',
+    'off-peak-consumption',
+    'demand',
+    'peak-demand',
+    'off-peak-demand'
+]
+
 class client:
     '''
     This class defines an active client of AGV for the energy management service
@@ -274,25 +283,73 @@ class uc:
     def deleteUC(self) -> int:
         pass
 
-    def createValue(self, month, valueType) -> int:
+    def createValue(self, month, valueType, value, year = None) -> int:
         '''
         This method will create a register of consumption or demand for this UC for a specific month
-        valueType can be:
+        :param month: A reference month
+        :param valueType: What type of value will be registered. It accepts the following values
             1. consumption
             2. peak-consumption
             3. off-peak-consumption
             4. demand
             5. peak-demand
             6. off-peak-demand
+        :param value: The value that'll be registered
+        :param year: A reference year. If not filled, it'll be the current year
         '''
+        
+        if valueType in valueTypesList:
+            existsValue = self.readValue(month, valueType, year)
+            date = dt.datetime.now()
+
+            if not year:
+                year = date.year
+
+            if not existsValue:
+                ucReg = self.readUC()
+                ucID = ucReg[0]
+
+                conn = sql.connect(dbName)
+                cursor = conn.cursor()
+
+                postoID = cursor.execute(
+                    '''
+                    SELECT id
+                    FROM posto_id
+                    WHERE descricao = ?
+                    ''', (hourDict[valueType], )
+                )
+
+                if typeDict[valueType] == 'demanda':
+                    cursor.execute(
+                        '''
+                        INSERT INTO demandas (uc_id, posto_id, mes, ano, valor, created_at)
+                        VALUES (?,?,?,?,?,?)
+                        ''', (ucID, postoID, month, year, value, date)
+                    )
+
+                else:
+                    cursor.execute(
+                        '''
+                        INSERT INTO consumos (uc_id, posto_id, mes, ano, valor, created_at)
+                        VALUES (?,?,?,?,?,?)
+                        ''', (ucID, postoID, month, year, value, date)
+                    )
+
+                conn.commit()
+                conn.close()
+
+            else:
+                raise RuntimeError('This value is already registered. Please update it or leave it')
+        
+        return 0
 
 
-        pass
-
-    def readValue(self, month, valueType) -> int:
+    def readValue(self, month, valueType, year = None) -> int:
         '''
         This method will read a register of consumption or demand for this UC for a specific month
-        valueType can be:
+        :param month: A reference month
+        :param valueType: What type of value will be registered. It accepts the following values
             1. consumption
             2. peak-consumption
             3. off-peak-consumption
@@ -300,6 +357,8 @@ class uc:
             5. peak-demand
             6. off-peak-demand
         '''
+         
+        
         pass
 
     def updateValue(self, month, valueType) -> int:
