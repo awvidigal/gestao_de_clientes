@@ -357,9 +357,39 @@ class uc:
             5. peak-demand
             6. off-peak-demand
         '''
-         
+
+        if valueType in valueTypesList:
+            conn = sql.connect(dbName)
+            cursor = conn.cursor()
+
+            date = dt.datetime.now()
+
+            if not year:
+                year = date.year
+
+            if typeDict[valueType] == 'consumo':
+                value = cursor.execute(
+                    '''
+                    SELECT *
+                    FROM consumos
+                    WHERE mes=?, ano=?
+                    ''', (month, year,)
+                ).fetchone()
+            else:
+                value = cursor.execute(
+                    '''
+                    SELECT *
+                    FROM demandas
+                    WHERE mes=?, ano=? 
+                    ''', (month, year,)
+                ).fetchone()
+                
+            return value
         
-        pass
+        else:
+            raise TypeError('valueType param not recognized') 
+        
+        
 
     def updateValue(self, month, valueType) -> int:
         '''
