@@ -1,8 +1,8 @@
-import datetime
 import imbox
 import sqlite3  as sql
 import pandas   as pd
 import datetime as dt
+from datetime import datetime
 
 dbName = 'agv.db'
 typeDict = {
@@ -23,6 +23,21 @@ hourDict = {
             'off-peak-demand':'Fora ponta'
         }
 
+monthDict = {
+            'jan':1,
+            'fev':2,
+            'mar':3,
+            'abr':4,
+            'mai':5,
+            'jun':6,
+            'jul':7,
+            'ago':8,
+            'set':9,
+            'out':10,
+            'nov':11,
+            'dez':12 
+        }
+
 valueTypesList = [
     'consumption',
     'peak-consumption',
@@ -32,11 +47,38 @@ valueTypesList = [
     'off-peak-demand'
 ]
 
+bGroupList = [
+    'B1',
+    'B2',
+    'B3',
+    'B4'
+]
+
+aGroupList = [
+    'A1',
+    'A2',
+    'A3',
+    'A3a',
+    'A4',
+    'A5'
+]
+
+modalityList = [
+    'Azul',
+    'Branca',
+    'Convencional',
+    'Convencional pré-pagamento',
+    'Distribuição',
+    'Geração',
+    'Verde'
+]
+
+
 class client:
     '''
     This class defines an active client of AGV for the energy management service
     '''
-    def __init__(self, name, address, CEP, cnpj, email, phone, legalPerson, paymentMethod = None) -> None:
+    def __init__(self, name: str, address: str, CEP: str, cnpj: str, email: str, phone: str, legalPerson: str, paymentMethod = None) -> None:
         '''
         Constructor of the class client
 
@@ -106,7 +148,7 @@ class client:
     def deleteClient(self) -> None:
         pass
 
-    def totalConsumption(self, month, consumptionType, year = None) -> int:
+    def totalConsumption(self, month: str, consumptionType: str, year = None) -> int:
         '''
             This method calculates the consumption of all the UCs linked to this client in a reference month 
 
@@ -171,7 +213,7 @@ class client:
         return total
     
 
-    def totalCosts(self, month) -> float:
+    def totalCosts(self, month: str) -> float:
         '''
             This method calculates the costs that would be if the UCs linked to the client had no savings in a reference month
             :param month: A reference month
@@ -180,32 +222,32 @@ class client:
         '''
         pass
 
-    def totalSavings(self, month):
+    def totalSavings(self, month: str):
         '''
             This method calculates the savings of all the UCs linked to the client in a reference month
         '''        
         pass
 
-    def linkUC(self, ucNumber):
+    def linkUC(self, ucNumber: str):
         pass
 
-    def unlinkUC(self, ucNumber):
+    def unlinkUC(self, ucNumber: str):
         pass
 
-    def createSavingsReport(self, month):
+    def createSavingsReport(self, month: str):
         '''
             This method creates a saving report for all the UCs linked to the client in a reference month
         '''
         pass
 
-    def sendSavingsReport(self,archive):
+    def sendSavingsReport(self,archive: str):
         '''
             This method sends an archive which must be a saving report created previously
         '''
         pass
 
 class uc:
-    def __init__(self, utility, number, client, address, CEP, subgroup, modality, peakDemand = None, offPeakDemand = None, demand = None) -> None:
+    def __init__(self, utility, number, client, address, CEP, subgroup, modality, clientClass, peakDemand = None, offPeakDemand = None, demand = None) -> None:
         self.utility        = utility
         self.number         = number
         self.client         = client
@@ -216,6 +258,7 @@ class uc:
         self.peakDemand     = peakDemand
         self.offPeakDemand  = offPeakDemand
         self.demand         = demand
+        self.clientClass    = clientClass
     
     '''
  ## ##   ### ##   ##  ###  ### ##             ## ##   #### ##    ##     ### ##   #### ##  
@@ -249,9 +292,9 @@ class uc:
             
             cursor.execute(
                 '''
-                INSERT INTO ucs (numero, concessionaria, client_id, endereco, cep, subgrupo, modalidade, demanda, demanda_ponta, demanda_fora_ponta, created_at)
+                INSERT INTO ucs (numero, concessionaria, client_id, endereco, cep, subgrupo, modalidade, classe, demanda, demanda_ponta, demanda_fora_ponta, created_at)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?)
-                ''', (self.number, self.utility, clientID, self.address, self.CEP, self.subgroup, self.modality, self.demand, self.peakDemand, self.offPeakDemand, date)
+                ''', (self.number, self.utility, clientID, self.address, self.CEP, self.subgroup, self.modality, self.clientClass, self.demand, self.peakDemand, self.offPeakDemand, date)
             )
             conn.commit()
             conn.close()
@@ -345,17 +388,20 @@ class uc:
         return 0
 
 
-    def readValue(self, month, valueType, year = None) -> int:
+    def readValue(self, month: str, valueType: str, year: int = None) -> int:
         '''
         This method will read a register of consumption or demand for this UC for a specific month
-        :param month: A reference month
-        :param valueType: What type of value will be registered. It accepts the following values
-            1. consumption
-            2. peak-consumption
-            3. off-peak-consumption
-            4. demand
-            5. peak-demand
-            6. off-peak-demand
+
+        Parameters
+        ----------
+        month : A reference month
+            The pattern is the first three letters of the month, in portuguese, with small letters
+        
+        year : A reference year, like an integer.
+            If the value is not filled, the function will consider the current year
+
+        valueType : What type of value will be registered. 
+            It accepts the following values: 'consumption', 'peak-consumption', 'off-peak-consumption', 'demand', 'peak-demand', 'off-peak-demand'
         '''
 
         if valueType in valueTypesList:
@@ -383,7 +429,7 @@ class uc:
                     WHERE mes=?, ano=? 
                     ''', (month, year,)
                 ).fetchone()
-                
+
             return value
         
         else:
@@ -427,11 +473,93 @@ class uc:
  ## ##   #### ##   ## ##   ### ##            ####       ####   ###  ##    ####    ## ##   ###  ##    
     '''
     
-    def totalCosts(self, month) -> float:
+    def monthlyCosts(self, month: str, year: int = None) -> float:
         '''
-        This method calculates the total cost for a reference month in this UC
+        This method calculates the total cost for a reference month in this UC, disregarding taxes like ICMS, PIS/COFINS
+
+        Parameters
+        ----------
+
+        month : A reference month
+            The pattern is the first three letters of the month, in portuguese, with small letters
+        
+        year : A reference year, like an integer.
+            If the value is not filled, the function will consider the current year
+
+        return: float
         '''
-        pass
+        # verificar se as tarifas para o período existem no db
+        
+        minDate = datetime(year, monthDict[month], 1)
+        if month == 'fev':
+            maxDate = datetime(year, monthDict[month], 28)
+
+        else:
+            maxDate = datetime(year, monthDict[month], 30)
+
+        conn = sql.connect(dbName)
+        cursor = conn.cursor()
+
+        tariffs = cursor.execute(
+            '''
+            SELECT * 
+            FROM tarifas
+            WHERE concessionaria=?, modalidade=?, subgrupo=?, classe=?
+            ''', (self.utility, self.modality, self.subgroup, self.clientClass)
+        ).fetchall()
+
+        conn.close()
+
+        for item in tariffs:
+            tariffs[1] = dt.datetime.strptime(tariffs[1])
+            tariffs[2] = dt.datetime.strptime(tariffs[2])
+
+        tariffs = pd.DataFrame(data=tariffs)
+        tariffs.query(f'inicio_vigencia <= {minDate} and fim_vigencia >= {maxDate}', inplace=True)
+        tariffs.reset_index(drop=True, inplace=True)
+
+        if not tariffs:
+            raise RuntimeError('Please, update the prices table for this utility')
+            return 0
+        
+        else:
+            if self.subgroup in bGroupList:
+                tusd    = tariffs.loc['0', 'tusd']
+                te      = tariffs.loc['0', 'te']
+
+                consumption = self.readValue(month, 'consumption', year)
+
+                monthlyCosts = consumption * (tusd + te) / 1000
+
+            elif self.subgroup in aGroupList:
+                demands         = tariffs.query("unidade == 'R$/kW'")
+                consumptions    = tariffs.query("unidade == 'R$/MWh'")
+
+                if self.modality == 'Azul':
+                    peakDemand = demands.query("posto == 'Ponta'")
+                    peakDemand.reset_index(drop=True, inplace=True)
+                    peakDemand = peakDemand.loc[0, 'tusd']
+
+                    offPeakDemand = demands.query("posto == 'Fora ponta")
+                    offPeakDemand.reset_index(drop=True, inplace=True)
+                    offPeakDemand = offPeakDemand.loc[0, 'tusd']
+
+                elif self.modality == 'Verde':
+                    #CONTINUAR DAQUI
+                    pass
+
+                
+
+
+        
+
+
+
+        # puxar as tarifas e armazenar em variáveis
+        # calcular para todos os custos
+        # somar todos os valores
+        
+            pass
 
     def totalSavings(self, month) -> float:
         '''
