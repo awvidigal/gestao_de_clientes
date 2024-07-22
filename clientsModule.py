@@ -480,15 +480,26 @@ class uc:
         Parameters
         ----------
 
-        month : A reference month
-            The pattern is the first three letters of the month, in portuguese, with small letters
+        month : str
+            A reference month. The pattern is the first three letters of the month, in portuguese, with small letters
         
-        year : A reference year, like an integer.
-            If the value is not filled, the function will consider the current year
+        year : int
+            A reference year, like an integer. If the value is not filled, the function will consider the current year
 
-        return: float
+        return : float
         '''
         # verificar se as tarifas para o período existem no db
+        
+        peakDemand          = None
+        offPeakDemand       = None
+        demand              = None
+        peakConsumption     = None
+        offPeakConsumption  = None
+        consumption         = None
+        monthlyCosts        = None
+
+        tusd    = None
+        te      = None
         
         minDate = datetime(year, monthDict[month], 1)
         if month == 'fev':
@@ -500,6 +511,7 @@ class uc:
         conn = sql.connect(dbName)
         cursor = conn.cursor()
 
+        # Baixa as tarifas filtradas por concessionaria, subgrupo, modalidade e classe
         tariffs = cursor.execute(
             '''
             SELECT * 
@@ -510,10 +522,12 @@ class uc:
 
         conn.close()
 
+        # Transforma as colunas de data em formato datetime
         for item in tariffs:
             tariffs[1] = dt.datetime.strptime(tariffs[1])
             tariffs[2] = dt.datetime.strptime(tariffs[2])
 
+        # Transforma a a lista de tarifas em um dataframe e filtra pela data da REH
         tariffs = pd.DataFrame(data=tariffs)
         tariffs.query(f'inicio_vigencia <= {minDate} and fim_vigencia >= {maxDate}', inplace=True)
         tariffs.reset_index(drop=True, inplace=True)
@@ -523,6 +537,23 @@ class uc:
             return 0
         
         else:
+            demandsPrice        = tariffs.query("unidade == 'R$/kW'")
+            consumptionsPrice   = tariffs.query("unidade == 'R$/MWh'")
+            
+            demandPrice         = demandsPrice.query("posto == 'Nao se aplica'")
+            demandPrice         = demandPrice.loc['0', 'tusd']
+            peakDemandPrice     = demandsPrice.query("posto == 'Ponta'")
+            peakDemandPrice     = peakDemandPrice.loc['0', 'tusd']
+            offPeakDemandPrice  = demandsPrice.query("posto == Fora ponta")
+            offPeakDemandPrice  = offPeakDemandPrice.loc['0', 'tusd']
+
+            consumptionPrice        = consumptionsPrice.query("posto == 'Nao se aplica'")
+            consumptionPrice        = consumptionPrice.loc['0', 'te'] + consumptionPrice.loc['0', 'tusd']
+            peakConsumptionPrice    = consumptionsPrice.query("posto == 'Ponta'")
+            peakConsumptionPrice    = peakConsumptionPrice.loc['0', 'te'] + peakConsumptionPrice.loc['0', 'tusd']
+            offPeakConsumptionPrice = consumptionsPrice.query("posto == 'Fora ponta'")
+            offPeakConsumptionPrice = offPeakConsumptionPrice.loc['0', 'te'] + offPeakConsumptionPrice.loc['0', 'tusd']
+            
             if self.subgroup in bGroupList:
                 tusd    = tariffs.loc['0', 'tusd']
                 te      = tariffs.loc['0', 'te']
@@ -532,34 +563,27 @@ class uc:
                 monthlyCosts = consumption * (tusd + te) / 1000
 
             elif self.subgroup in aGroupList:
-                demands         = tariffs.query("unidade == 'R$/kW'")
-                consumptions    = tariffs.query("unidade == 'R$/MWh'")
-
-                if self.modality == 'Azul':
-                    peakDemand = demands.query("posto == 'Ponta'")
-                    peakDemand.reset_index(drop=True, inplace=True)
-                    peakDemand = peakDemand.loc[0, 'tusd']
-
-                    offPeakDemand = demands.query("posto == 'Fora ponta")
-                    offPeakDemand.reset_index(drop=True, inplace=True)
-                    offPeakDemand = offPeakDemand.loc[0, 'tusd']
-
-                elif self.modality == 'Verde':
-                    #CONTINUAR DAQUI
-                    pass
-
+                peakConsumption     = self.readValue(month, 'peak-consumption', year)
+                offPeakConsumption  = self.readValue(month, 'off-peak-consumption', year)
                 
+                peakDemand      = self.readValue(month, 'peak-demand', year)
+                offPeakDemand   = self.readValue(month, 'off-peak-demand', year)
+                demand          = self.readValue(month, 'demand', year)
 
+                monthlyCosts = (
+                    peakConsumption * (peakConsumptionPrice / 1000) + 
+                    offPeakConsumption * (offPeakConsumptionPrice / 1000) +
+                    demand * demandPrice +
+                    peakDemand * peakDemandPrice +
+                    offPeakDemand * offPeakDemandPrice
+                )
 
-        
+            else:
+                raise RuntimeError('Subgroup not finded')
+                return 0
+            
+            return monthlyCosts
 
-
-
-        # puxar as tarifas e armazenar em variáveis
-        # calcular para todos os custos
-        # somar todos os valores
-        
-            pass
 
     def totalSavings(self, month) -> float:
         '''
