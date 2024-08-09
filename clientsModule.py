@@ -585,10 +585,26 @@ class uc:
             return monthlyCosts
 
 
-    def totalSavings(self, month) -> float:
+    def totalSavings(self, month: str, year: int = None) -> float:
         '''
         This method calculates the total savings for a reference month in this UC
+
+        Parameters
+        ----------
+
+        month : str
+            A reference month. The pattern is the three first letters of the month in portuguese
+
+        year : int
+            A reference year. If not filled, the software will consider the current year
+
+        return : float
         '''
+
+        # Implementar tabela no db similar à tabela de consumos, porém com os custos com cooperativa ou acl
+        # Cooperativa, energia contratada, encargos
+        # Calcular a economia total no mes com base nessa tabela
+        # 'CRUDValue' deve servir para ler os valores de economia também
         pass
 
     def createReport(self, period) -> str:
